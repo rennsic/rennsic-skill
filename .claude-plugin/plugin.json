@@ -1,0 +1,5 @@
+{
+  "name": "rennsic-vin-history",
+  "description": "Check a VIN for commercial rental history on a peer-to-peer rental platform through the Rennsic API. Returns trip counts, per-owner rental histories, and fleet percentile context.",
+  "version": "0.1.0"
+}
