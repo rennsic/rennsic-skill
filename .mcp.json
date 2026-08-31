@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rennsic": {
+      "type": "http",
+      "url": "${RENNSIC_BASE_URL:-https://rennsic.com}/api/mcp/"
+    }
+  }
+}

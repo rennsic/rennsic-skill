@@ -15,9 +15,12 @@ If this session has the Rennsic MCP server connected (tools named `vin_lookup`,
 `search_history`, `credit_usage`, `request_report`), use those tools instead of
 the curl recipes below: they carry the same gates and answer with the same
 payloads, and the client handles auth. The server also provides two prompts a
-user can invoke by name, `check_vin` and `account_status`. This skill's shell
-recipes are for scripts, CI, and environments without MCP. The reading rules in
-this file apply either way; the payloads are identical.
+user can invoke by name, `check_vin` and `account_status`. The Claude Code
+plugin bundles this server, so it is normally already registered; if its tools
+are absent, the user likely declined the connection, and the recipes below are
+the fallback. This skill's shell recipes are for scripts, CI, and environments
+without MCP. The reading rules in this file apply either way; the payloads are
+identical.
 
 ## Setup
 

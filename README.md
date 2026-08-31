@@ -39,16 +39,26 @@ to `https://rennsic.com`.
 Treat the token as a credential: keep it out of source control, shared
 transcripts, and client-side code.
 
-## MCP alternative
+## Bundled MCP server
 
-The same API is exposed as a remote MCP server at
-https://rennsic.com/api/mcp/, which gives an MCP client the lookups as native
+The plugin bundles the Rennsic MCP server (`.mcp.json`, pointing at
+https://rennsic.com/api/mcp/), which gives Claude Code the lookups as native
 tools instead of shell commands (`vin_lookup`, `search_history`,
-`credit_usage`, `request_report`), plus two prompts a user invokes by name:
-`check_vin`, with VIN autocompletion from the account's own paid lookups, and
-`account_status`. When the MCP server is connected, the skill defers to those
-tools and keeps only the reading rules. The API console has setup snippets for
-Claude Code, Cursor, and the Claude API.
+`credit_usage`, `request_report`), plus two prompts invoked by name:
+`/mcp__rennsic__check_vin`, with VIN autocompletion from the account's own
+paid lookups, and `/mcp__rennsic__account_status`. When the server is
+connected, the skill defers to those tools and keeps only the reading rules.
+
+Installing the plugin registers the server; Claude Code asks for approval on
+first use, then signs in with OAuth in the browser. No token is shipped in the
+plugin and none is needed for MCP. `RENNSIC_BASE_URL` points the bundled
+server at a different deployment, the same variable the shell recipes use. To
+use the skill without the server, decline the approval or add `rennsic` to
+`disabledMcpServers` in Claude Code settings; the shell recipes keep working
+on the API token alone.
+
+Other MCP clients (Cursor, claude.ai, the Claude API) connect to the same URL
+directly; the API console has setup snippets.
 
 ## Contents
 
@@ -56,6 +66,7 @@ Claude Code, Cursor, and the Claude API.
 | --- | --- |
 | `skills/rennsic-vin-history/SKILL.md` | Operating instructions the agent loads |
 | `skills/rennsic-vin-history/reference.md` | Full response shapes and error codes |
+| `.mcp.json` | The bundled MCP server registration |
 
 ## License
 
