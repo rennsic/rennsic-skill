@@ -42,8 +42,12 @@ transcripts, and client-side code.
 ## MCP alternative
 
 The same API is exposed as a remote MCP server at
-https://rennsic.com/api/mcp/, which gives an MCP client the lookups as
-native tools instead of shell commands. The API console has setup snippets for
+https://rennsic.com/api/mcp/, which gives an MCP client the lookups as native
+tools instead of shell commands (`vin_lookup`, `search_history`,
+`credit_usage`, `request_report`), plus two prompts a user invokes by name:
+`check_vin`, with VIN autocompletion from the account's own paid lookups, and
+`account_status`. When the MCP server is connected, the skill defers to those
+tools and keeps only the reading rules. The API console has setup snippets for
 Claude Code, Cursor, and the Claude API.
 
 ## Contents

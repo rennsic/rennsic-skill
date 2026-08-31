@@ -9,6 +9,16 @@ Rennsic answers one question: was this specific vehicle rented commercially on
 a peer-to-peer rental platform, and how hard. Conventional vehicle history
 reports do not carry that.
 
+## Prefer the MCP server when it is connected
+
+If this session has the Rennsic MCP server connected (tools named `vin_lookup`,
+`search_history`, `credit_usage`, `request_report`), use those tools instead of
+the curl recipes below: they carry the same gates and answer with the same
+payloads, and the client handles auth. The server also provides two prompts a
+user can invoke by name, `check_vin` and `account_status`. This skill's shell
+recipes are for scripts, CI, and environments without MCP. The reading rules in
+this file apply either way; the payloads are identical.
+
 ## Setup
 
 - Token: read from `$RENNSIC_API_TOKEN`. If it is unset, stop and tell the user
@@ -43,6 +53,21 @@ curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/credit-usage/" \
   -H "Authorization: Token $RENNSIC_API_TOKEN"
 ```
 
+Request the branded PDF report for a VIN this account has already looked up,
+free:
+
+```bash
+curl -s -X POST "${RENNSIC_BASE_URL:-https://rennsic.com}/api/vin/1HGBH41JXMN109186/report/" \
+  -H "Authorization: Token $RENNSIC_API_TOKEN"
+```
+
+Download the PDF once its status is `ready`, free:
+
+```bash
+curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/vin/1HGBH41JXMN109186/report/download/" \
+  -H "Authorization: Token $RENNSIC_API_TOKEN" -o report.pdf
+```
+
 ## Credit discipline
 
 - Check `/api/credit-usage/` before any batch of lookups, and tell the user what
@@ -56,12 +81,28 @@ curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/credit-usage/" \
   credits or upgrade their plan.
 - A 429 means the rate limit is spent. Wait rather than hammering the endpoint.
 
+## PDF reports
+
+The report is the same branded PDF the web console produces, a second rendering
+of an answer already paid for, so requesting and downloading it never costs a
+credit. The flow is asynchronous: POST the request, poll until the `report`
+block's status is `ready` or `failed`, then fetch `download_url`. Poll by
+re-POSTing or by re-running the free lookup; repeat requests dedupe onto the
+generation already running, so polling is safe. A 404 means the account never
+paid for the VIN or it aged out of the plan's retention window; run the lookup
+first. A 409 means the VIN has no listings on record, so there is nothing to
+build a report from. Both are verdicts, not transient errors: do not retry
+them.
+
 ## Reading the result
 
 `found: false` is a verdict, not a failure. It means no commercial rental
 history is on record for that VIN in the dataset. The credit is spent and the
 answer is delivered. Do not retry the VIN, and do not report it to the user as
-an error. Report it as what it is: no commercial rental history found.
+an error. Report it as what it is: no commercial rental history found. The
+response still carries the decoded `identity` at the top level, so read the
+year, make, and model back to the user; if it names a different car than they
+meant, the VIN was mistyped.
 
 `summary.total_trips` is the headline. It is built in layers, so read it in
 layers:
@@ -82,10 +123,25 @@ listing text. It can disagree with a listing's raw make, model, or trim, because
 hosts type those by hand. Prefer the decoded identity when describing the car.
 
 `summary.usage_stats` places the trip total in context: `overall_percentile`
-against the whole fleet, `make_percentile` against the same make, each with the
-matching median. The block is null when there is not enough comparable data, and
-`make_percentile` alone can be null for the same reason. Do not invent a ranking
-when the field is null.
+against the whole fleet, `make_percentile` against the same make, and
+`model_percentile` against the same make and model, each with the matching
+median. The model figure is the sharpest comparison, so lead with it when it is
+present. The block is null when there is not enough comparable data, and
+`make_percentile` or `model_percentile` can each be null on their own for the
+same reason. Do not invent a ranking when a field is null.
+
+`review_risk` carries renter-reported condition evidence when Rennsic has
+indexed reviews for the VIN: a 0-100 score, a coverage note naming what it
+rests on, and up to four quoted findings, worst first. It is null for almost
+every VIN, and null means no review data is indexed, never that no problems
+were reported. Never present a null as a clean bill of health.
+
+`record_url` is the VIN's record page on the web console. Hand it to the user
+for the full visual record; it needs their signed-in browser session, so do not
+try to fetch it with the API token.
+
+`report` is the account's PDF report state for the VIN (see PDF reports above).
+Its `download_url`, unlike `record_url`, works with the API token.
 
 `cached: true` means this account had already paid for the VIN, so the call was
 free. The data is still freshly aggregated, not a stale copy.
