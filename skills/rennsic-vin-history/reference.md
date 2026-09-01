@@ -1,7 +1,7 @@
 # Rennsic API reference
 
 Base URL `https://rennsic.com`, overridable with `RENNSIC_BASE_URL`.
-Every request carries `Authorization: Token $RENNSIC_API_TOKEN`.
+Every request carries `Authorization: Bearer $RENNSIC_API_TOKEN` (the legacy Token keyword is no longer accepted).
 
 ## GET /api/vin/{vin}/
 
@@ -103,7 +103,7 @@ A hit:
 | Field | Notes |
 | --- | --- |
 | `status` | `none`, `pending`, `ready`, or `failed`. `none` means nothing is downloadable right now: no report was requested, or a finished one is no longer servable (retention lapsed). |
-| `download_url` | Null except when `status` is `ready`. Unlike `record_url`, an API resource: fetch it with the token (or a signed-in session). |
+| `download_url` | Null except when `status` is `ready`. A signed link needing NO auth, valid one hour from the response that minted it, fresh in every response. An authentic expired link returns 410 with a pointer to the record page; forged links 404. |
 
 ### review_risk (when not null)
 
@@ -210,16 +210,24 @@ by re-running the free lookup, and stop once the status is `ready` or `failed`.
 
 ## GET /api/vin/{vin}/report/download/
 
-Free. The PDF as `application/pdf`, served only to the owning account, only
-while the report is `ready` and inside the plan's retention window; 404
-otherwise. This is the URL the `report` block's `download_url` carries.
+Free. The PDF as `application/pdf` for the owning account (Bearer header or a
+signed-in session), only while the report is `ready` and inside retention; 404
+otherwise. This is the stable authenticated route.
+
+## GET /api/reports/signed/{token}/
+
+The route behind the `report` block's `download_url`: a signed link, no auth,
+valid one hour from the response that minted it. 410 for an authentic link
+past its hour (with the record page in the body); 404 for a forged token or a
+report no longer servable. Never construct this URL by hand; take it from a
+response.
 
 ## Errors
 
 | Status | Meaning | What to do |
 | --- | --- | --- |
 | 400 | The VIN is structurally impossible (wrong length, illegal characters, or I/O/Q in a 17-character VIN). No credit charged. | Fix the VIN. Check for I/O/Q mistyped for 1/0/0. |
-| 401 | Missing or invalid token. | Tell the user to check `RENNSIC_API_TOKEN` against the API console. Do not retry. |
+| 401 | Missing or invalid token, or the legacy `Token` keyword instead of `Bearer`. | Tell the user to check `RENNSIC_API_TOKEN` against the API console. Do not retry. |
 | 402 | Out of credits. | Tell the user to buy credits or upgrade. Do not retry. |
 | 403 | No active Pro or Dealer subscription, or the calling IP is not on the account's whitelist. | Relay the message in the response body. Do not retry. |
 | 404 | On the report routes: no report to act on for this account and VIN (never paid, retention lapsed, or nothing downloadable yet). | Run the lookup, or request a report and poll. |

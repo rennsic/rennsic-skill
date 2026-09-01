@@ -28,8 +28,9 @@ identical.
   to get one from https://rennsic.com/api/reference/ (needs a Pro or Dealer
   subscription). Never ask the user to paste the token into the conversation.
 - Base URL: `$RENNSIC_BASE_URL`, defaulting to `https://rennsic.com`.
-- Auth header: `Authorization: Token $RENNSIC_API_TOKEN`. The keyword is
-  `Token`, not `Bearer`. Bearer applies only to the MCP endpoint at `/api/mcp/`.
+- Auth header: `Authorization: Bearer $RENNSIC_API_TOKEN`. Bearer everywhere:
+  the REST API and the MCP endpoint use the same standard scheme (the legacy
+  Token keyword is no longer accepted).
 
 ## Endpoints
 
@@ -39,21 +40,21 @@ rejected with a 400 and no charge.
 
 ```bash
 curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/vin/1HGBH41JXMN109186/" \
-  -H "Authorization: Token $RENNSIC_API_TOKEN"
+  -H "Authorization: Bearer $RENNSIC_API_TOKEN"
 ```
 
 Search history, free, 25 per page:
 
 ```bash
 curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/history/?page=1" \
-  -H "Authorization: Token $RENNSIC_API_TOKEN"
+  -H "Authorization: Bearer $RENNSIC_API_TOKEN"
 ```
 
 Credit balance and request counts, free:
 
 ```bash
 curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/credit-usage/" \
-  -H "Authorization: Token $RENNSIC_API_TOKEN"
+  -H "Authorization: Bearer $RENNSIC_API_TOKEN"
 ```
 
 Request the branded PDF report for a VIN this account has already looked up,
@@ -61,15 +62,21 @@ free:
 
 ```bash
 curl -s -X POST "${RENNSIC_BASE_URL:-https://rennsic.com}/api/vin/1HGBH41JXMN109186/report/" \
-  -H "Authorization: Token $RENNSIC_API_TOKEN"
+  -H "Authorization: Bearer $RENNSIC_API_TOKEN"
 ```
 
-Download the PDF once its status is `ready`, free:
+Download the PDF once its status is `ready`: the `report.download_url` in any
+response is a signed link that needs NO auth header and works for one hour
+from the response that minted it, so it can be handed to a person, a browser,
+or a plain curl:
 
 ```bash
-curl -s "${RENNSIC_BASE_URL:-https://rennsic.com}/api/vin/1HGBH41JXMN109186/report/download/" \
-  -H "Authorization: Token $RENNSIC_API_TOKEN" -o report.pdf
+curl -s -o report.pdf "<the download_url from the response>"
 ```
+
+An expired link is never a dead end: re-running the free lookup or the report
+request returns a fresh one. The authenticated route
+(`/api/vin/<vin>/report/download/` with the Bearer header) also still works.
 
 ## Credit discipline
 
@@ -144,7 +151,7 @@ for the full visual record; it needs their signed-in browser session, so do not
 try to fetch it with the API token.
 
 `report` is the account's PDF report state for the VIN (see PDF reports above).
-Its `download_url`, unlike `record_url`, works with the API token.
+Its `download_url` is a signed link: no auth needed, valid for one hour, re-minted in every response.
 
 `cached: true` means this account had already paid for the VIN, so the call was
 free. The data is still freshly aggregated, not a stale copy.
