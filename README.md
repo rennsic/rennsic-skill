@@ -6,6 +6,12 @@ ran, how many separate owners listed it, and how that volume compares to the
 rest of the fleet. Conventional vehicle history reports miss this entirely. A
 car with hundreds of commercial rides can show a clean report.
 
+Where renters left reviews, a lookup also carries what they reported about the
+car: how many distinct issues, how much evidence that rests on, any
+disclosures, and a few quoted findings. There is no score attached to it, by
+decision, and no review data for a VIN means none is indexed rather than that
+the car came back clean.
+
 This repository packages that API as an Agent Skill, so an LLM agent can run VIN
 lookups and read the results correctly.
 
@@ -26,8 +32,9 @@ cp -r skills/rennsic-vin-history ~/.claude/skills/
 
 ## Token
 
-The API requires a Pro or Dealer subscription. Get your token from the API
-console at https://rennsic.com/api/reference/ and export it:
+The API requires an active Pro or Dealer plan; Starter is dashboard only. Get
+your token from the API console at https://rennsic.com/api/reference/ and
+export it:
 
 ```
 export RENNSIC_API_TOKEN="your-token"

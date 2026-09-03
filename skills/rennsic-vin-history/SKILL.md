@@ -25,8 +25,10 @@ identical.
 ## Setup
 
 - Token: read from `$RENNSIC_API_TOKEN`. If it is unset, stop and tell the user
-  to get one from https://rennsic.com/api/reference/ (needs a Pro or Dealer
-  subscription). Never ask the user to paste the token into the conversation.
+  to get one from https://rennsic.com/api/reference/ (needs an active Pro or
+  Dealer plan; Starter is dashboard only, and a complimentary Pro or Dealer
+  plan on an account counts the same as a paid one). Never ask the user to
+  paste the token into the conversation.
 - Base URL: `$RENNSIC_BASE_URL`, defaulting to `https://rennsic.com`.
 - Auth header: `Authorization: Bearer $RENNSIC_API_TOKEN`. Bearer everywhere:
   the REST API and the MCP endpoint use the same standard scheme (the legacy
@@ -88,7 +90,9 @@ request returns a fresh one. The authenticated route
 - Check `/api/history/` when you are unsure whether a VIN was already paid for.
   A VIN listed there re-runs free.
 - A 402 means the balance is exhausted. Do not retry it. Tell the user to buy
-  credits or upgrade their plan.
+  credits or upgrade their plan. Credits are prepaid in packs of 1, 3, 5, 10,
+  50, or 100 from the plans page, and they do not expire, so an unused balance
+  carries forward.
 - A 429 means the rate limit is spent. Wait rather than hammering the endpoint.
 
 ## PDF reports
@@ -103,6 +107,12 @@ paid for the VIN or it aged out of the plan's retention window; run the lookup
 first. A 409 means the VIN has no listings on record, so there is nothing to
 build a report from. Both are verdicts, not transient errors: do not retry
 them.
+
+A report asked for while the VIN's reviews are still being classified waits
+briefly for that analysis, and one that printed without it is re-rendered in
+place when the analysis lands. The report stays `ready` and downloadable
+throughout, and the file at the same address gains the review section on its
+own, so never tell a user to request a second report for that.
 
 ## Reading the result
 
@@ -141,10 +151,32 @@ present. The block is null when there is not enough comparable data, and
 same reason. Do not invent a ranking when a field is null.
 
 `review_risk` carries renter-reported condition evidence when Rennsic has
-indexed reviews for the VIN: a 0-100 score, a coverage note naming what it
-rests on, and up to four quoted findings, worst first. It is null for almost
-every VIN, and null means no review data is indexed, never that no problems
-were reported. Never present a null as a clean bill of health.
+indexed reviews for the VIN. Lead with `issue_count`, the number of distinct
+issues renters reported. Then the evidence it rests on: `coverage_note` is that
+line already rendered (findings across reviews, and how recent), so quote it
+rather than re-deriving the denominator. Then `flag_labels`, the disclosures
+renters reported, such as a repossession or non-stock modifications; these are
+separate from the condition findings and are usually empty. Then up to four
+quoted `findings`, worst first, each with its category, severity, trip impact,
+and a short verbatim `excerpt`.
+
+There is no 0-100 score in the response. One is computed internally and is
+deliberately shown to no customer and returned by no endpoint, because the
+evidence carries more than a grade would. Do not report a rating, do not
+compute one from the findings, and do not describe the block as a score.
+
+`review_risk: null` is the answer for almost every VIN, and it means no review
+data is indexed, never that no problems were reported. Never present a null as
+a clean bill of health.
+
+A block with `pending: true` is not absence: the VIN's reviews are being
+classified right now, `issue_count` and the rest are empty for the moment, and
+the analysis usually lands within a minute. The first paid lookup of a VIN is
+what starts it. Say the analysis is still running, quote the `progress` block
+if the user wants detail (stage, how many reviews, how many model calls sent
+and returned, seconds elapsed), and offer to re-run the VIN shortly, which is
+free once it is paid for. Do not predict a finish time; `progress` carries work
+done and no estimate, by design.
 
 `record_url` is the VIN's record page on the web console. Hand it to the user
 for the full visual record; it needs their signed-in browser session, so do not

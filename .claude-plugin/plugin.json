@@ -1,5 +1,5 @@
 {
   "name": "rennsic-vin-history",
   "description": "Check a VIN for commercial rental history on a peer-to-peer rental platform through the Rennsic API. Returns trip counts, per-owner rental histories, fleet and model percentile context, renter-reported condition evidence, and the account's PDF report, which it can generate and download. Bundles the Rennsic MCP server, connected via OAuth on first use.",
-  "version": "0.4.0"
+  "version": "0.5.0"
 }

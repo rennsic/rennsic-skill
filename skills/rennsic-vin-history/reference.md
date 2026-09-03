@@ -96,7 +96,7 @@ A hit:
 | `identity` | Present only when `found` is false: the decoded year/make/model at the top level, so a paid no-match still names the car. On a hit the same block is inside `summary`. |
 | `summary` | Present only when `found` is true. |
 | `listings` | Present only when `found` is true. One entry per rental history, ordered by trips descending. |
-| `review_risk` | Present only when `found` is true. Renter-reported condition evidence, or null. Null is the overwhelmingly common case and means no review data is indexed for the VIN, never that no problems were reported. |
+| `review_risk` | Present only when `found` is true. Renter-reported condition evidence, or null. Null is the overwhelmingly common case and means no review data is indexed for the VIN, never that no problems were reported. A block whose `pending` is true is the one thing that is not absence: the reviews are being classified right now. |
 
 ### report
 
@@ -107,14 +107,47 @@ A hit:
 
 ### review_risk (when not null)
 
+There is no 0-100 score in this block. One was computed at one point and is
+deliberately returned by no endpoint: the evidence, not a grade, is what a
+reader can act on. Do not invent a rating from these fields.
+
 | Field | Notes |
 | --- | --- |
-| `score` | 0 to 100 across every reported issue, no discount for age. |
-| `scoring_version` | Rubric plus aggregation version that produced the score. |
-| `issue_count`, `evidence_comments`, `total_comments` | How many distinct issues, how many reviews carried evidence, and how many reviews were read in total. |
+| `pending` | False on a finished analysis. True while this VIN's reviews are still being classified: `issue_count` and every other figure are null or empty, and the analysis usually lands within a minute. Re-run the lookup (free for a VIN already paid for) rather than caching the empty block. |
+| `progress` | Only when `pending` is true, else null. What the run has done so far: `stage` (`queued`, `classifying`, `scoring`), `comments`, `cached`, `batches`, `batches_done`, `elapsed_seconds`, `started_at`. Work done, never time remaining: there is no estimate here and none to be inferred. |
+| `issue_count` | Distinct issues renters reported. The headline figure; lead with it. |
+| `evidence_comments`, `total_comments` | How many reviews carried evidence, and how many reviews were read in total. The denominator is the point. |
 | `newest_comment_date` | Date of the most recent evidence, or null. |
-| `coverage_note` | One rendered line naming what the score rests on. Quote it rather than re-deriving the denominator. |
-| `findings` | Up to four, worst first: `category`, `category_label`, `severity`, `trip_impact`, `excerpt`, `comment_date`, `contribution`, `rank`. `excerpt` is a short verbatim span; full review bodies and reviewer identity are deliberately absent. |
+| `coverage_note` | One rendered line naming what the analysis rests on, e.g. `3 findings across 55 reviews, most recent 2024-04-08`. Quote it rather than re-deriving the denominator. |
+| `flags`, `flag_labels` | Non-scored disclosures renters reported: `repossessed_or_stolen`, `modified`, `infestation`. `flag_labels` is the same list in reader-facing wording, same order. Usually empty. Kept apart from the findings, which are about the car's condition. |
+| `findings` | Up to four, worst first: `category`, `category_label`, `severity` (`minor`, `moderate`, `severe`), `trip_impact` (`none`, `partial`, `ended`), `excerpt`, `comment_date`, `rank`. `excerpt` is a short verbatim span; full review bodies and reviewer identity are deliberately absent. |
+| `scoring_version` | Provenance of the analysis, e.g. `v4+agg1rt`. Not a figure about the vehicle and nothing to show a user. |
+
+A pending block, for contrast with a null:
+
+```json
+{
+  "pending": true,
+  "progress": {
+    "stage": "classifying",
+    "comments": 61,
+    "cached": 12,
+    "batches": 5,
+    "batches_done": 2,
+    "elapsed_seconds": 18,
+    "started_at": "2026-08-30T14:02:11Z"
+  },
+  "scoring_version": null,
+  "issue_count": null,
+  "evidence_comments": null,
+  "total_comments": null,
+  "newest_comment_date": null,
+  "coverage_note": null,
+  "flags": [],
+  "flag_labels": [],
+  "findings": []
+}
+```
 
 ### summary
 
@@ -181,6 +214,10 @@ page; `page_size` raises it up to 100.
 the call that paid for the VIN; `cached` is its inverse. A VIN appearing here at
 all can be re-looked-up free.
 
+History rows carry no decoded identity, so they name a VIN and not a car. To
+say what a listed VIN is, re-run the lookup on it; that call is free for any
+VIN on this list.
+
 ## GET /api/credit-usage/
 
 Free.
@@ -200,6 +237,12 @@ same `report` block the lookup carries: 202 with `status: "pending"` when a
 generation was started, 200 with the current block when it deduped (already
 pending, or already ready). Generation is asynchronous; poll by re-POSTing or
 by re-running the free lookup, and stop once the status is `ready` or `failed`.
+
+A report asked for while the VIN's reviews are still being classified waits
+briefly for that analysis, and one that printed without it is re-rendered in
+place when the analysis lands: the row stays `ready` and downloadable the whole
+time, and the file at the same address gains the review section on its own.
+Never tell a user to request a second report for that.
 
 | Status | Meaning |
 | --- | --- |
@@ -229,7 +272,7 @@ response.
 | 400 | The VIN is structurally impossible (wrong length, illegal characters, or I/O/Q in a 17-character VIN). No credit charged. | Fix the VIN. Check for I/O/Q mistyped for 1/0/0. |
 | 401 | Missing or invalid token, or the legacy `Token` keyword instead of `Bearer`. | Tell the user to check `RENNSIC_API_TOKEN` against the API console. Do not retry. |
 | 402 | Out of credits. | Tell the user to buy credits or upgrade. Do not retry. |
-| 403 | No active Pro or Dealer subscription, or the calling IP is not on the account's whitelist. | Relay the message in the response body. Do not retry. |
+| 403 | No active plan, a plan without API access (Starter), or the calling IP is not on the account's whitelist. | Relay the message in the response body. Do not retry. |
 | 404 | On the report routes: no report to act on for this account and VIN (never paid, retention lapsed, or nothing downloadable yet). | Run the lookup, or request a report and poll. |
 | 409 | On the report trigger: the VIN has no listings on record, so there is nothing to report on. | Relay the message. Do not retry. |
 | 429 | Rate limited. VIN lookups allow 30 per minute. | Wait, then resume. Do not parallelize around it. |
